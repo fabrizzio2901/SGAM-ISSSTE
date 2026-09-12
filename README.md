@@ -1,250 +1,106 @@
-# SGAM – Sistema de Gestión de Asistencias Médicas
-### Versión 1.2.0
+# SGAM — conciliación de asistencias
 
-Aplicación de escritorio monolítica portable en Python que automatiza la conciliación de asistencias de médicos e internos hospitalarios, cruzando una plantilla maestra Excel contra el reporte del lector biométrico de huella digital.
+[English](README.en.md)
 
----
+Aplicación de escritorio en Python para cruzar un catálogo de personal, roles de guardia e incidencias con registros de entrada y salida. Presenta un calendario por persona y permite exportar reportes Excel.
 
-## Estructura del Proyecto
+Está orientada a la revisión administrativa de asistencias de internos y residentes. El procesamiento utiliza archivos locales; este repositorio no demuestra una integración directa con un dispositivo biométrico ni resultados de uso institucional.
 
-```
-SGAM/
-├── main.py                       ← Punto de entrada y verificación de dependencias
-├── ingestion.py                  ← Carga, validación y normalización de archivos
-├── core.py                       ← Motor de cruce de datos y algoritmo semáforo
-├── ui.py                         ← Interfaz gráfica (CustomTkinter)
-├── export.py                     ← Exportación Excel institucional (individual y maestro)
-├── utils.py                      ← Estadísticas avanzadas, rankings y tendencias
-├── generar_datos_ejemplo.py      ← Genera archivos de prueba con datos ficticios
-├── build_exe.py                  ← Empaqueta la app en ejecutable .exe (PyInstaller)
-├── requirements.txt              ← Dependencias Python
-├── assets/
-│   ├── logo_hospital.png         ← Logo institucional (PNG, opcional)
-│   └── icono.ico                 ← Ícono de la aplicación (.exe)
-├── data/
-│   ├── Estructura_Maestra_Hospital2.xlsx
-│   └── Reporte_Scanner_Enero2025.xlsx
-└── output/                       ← Reportes generados automáticamente
-```
+## Funciones presentes en el código
 
----
+- Lectura y normalización de una plantilla Excel y reportes de escáner.
+- Detección de registros ajenos al catálogo y advertencias de validación.
+- Evaluación de asistencias, retardos, faltas, guardias y postguardias.
+- Aplicación de incidencias y días festivos.
+- Consulta por persona, filtros y paneles de análisis.
+- Exportación individual, por grupo y consolidada a Excel.
 
-## Instalación Rápida
+## Ejecutar
+
+Requiere Python con Tk/Tcl para la interfaz. El procesamiento se verificó con Python 3.12; no hay una versión de Python fijada en el repositorio.
 
 ```bash
-# 1. Clonar o descomprimir el proyecto
-cd SGAM/
+git clone https://github.com/fabrizzio2901/SGAM.git
+cd SGAM
+python -m venv .venv
+```
 
-# 2. Crear entorno virtual (recomendado)
-python -m venv venv
-venv\Scripts\activate          # Windows
-source venv/bin/activate       # Linux / macOS
+```powershell
+# Windows PowerShell
+.\.venv\Scripts\Activate.ps1
+```
 
-# 3. Instalar dependencias
-pip install -r requirements.txt
+```bash
+# macOS / Linux
+source .venv/bin/activate
+```
 
-# 4. Generar datos de prueba (opcional, para verificar que todo funciona)
-python generar_datos_ejemplo.py
-
-# 5. Ejecutar
+```bash
+python -m pip install -r requirements.txt
 python main.py
 ```
 
----
+Dependencias declaradas: CustomTkinter, pandas, openpyxl, Matplotlib, Pillow, xlrd y PyInstaller. No requiere claves de API.
 
-## Archivos de Entrada Requeridos
+## Formato de entrada actual
 
-### 1. Plantilla Maestra — `Estructura_Maestra_Hospital2.xlsx`
+El lector activo es `cargar_plantilla` en `ingestion.py`. Las primeras cinco hojas deben existir, aunque las tres de incidencias pueden estar vacías.
 
-| Hoja | Columnas obligatorias | Columnas opcionales |
-|------|-----------------------|---------------------|
-| `1_Reglas_ID` | Regla de Negocio, Descripción | — |
-| `2_Catalogo_Personal` | ID_Biometrico_SIRA, Nombre_Completo, Tipo, Grado, Universidad, Estatus, Vigencia | Especialidad_Base¹, Periodo_Ingreso², Foto_Ruta³ |
-| `3_Registro_Incidencias` | ID_Institucional, Tipo_Incidencia, Fecha_Inicio, Fecha_Fin, Destino_o_Servicio, Notas_Motivo | — |
-| `4_Rol_Guardias` | Fecha_Guardia, ID_Institucional, Servicio_Cubierto, TIPO | — |
+| Hoja | Columnas necesarias |
+|---|---|
+| `1_Catalogo_Personal` | `ID`, `Nombre completo`, `Estatus`, `Tipo de personal` |
+| `2_Rol_Guardias` | `ID`, `Rotación` |
+| `3_Registro_Incidencias` | Si tiene registros: `ID`, `Ausencia Justificada`, `Fecha Inicio`, `Fecha Termino` |
+| `4_Vacaciones` | Las mismas columnas de incidencias |
+| `5_Rotaciones` | Las mismas columnas de incidencias |
+| `6_Dias_Festivos`, opcional | Columna A: motivo; columna B: fecha |
 
-> ¹ Especialidad_Base puede estar vacía para Internos.  
-> ² Periodo_Ingreso acepta `A` (Primavera) o `B` (Otoño).  
-> ³ Foto_Ruta: ruta relativa o absoluta a JPG/PNG del médico (se muestra en el tablero).
+El catálogo admite información adicional, como `Universidad`, `Especialidad`, `Subespecialidad`, `Alta Especialidad`, `Periodo ingreso` y una columna de foto. `Rotación` utiliza grupos A, B, C o D.
 
-### 2. Reporte del Escáner Biométrico
+Para una prueba desde la interfaz, utiliza un escáner **.xlsx** con columnas `ID`, `Fecha`, `Entrada` y `Salida`. Debe incluir al menos una entrada con fecha válida y un ID del catálogo. El módulo de lectura admite CSV, pero la selección de un CSV en la interfaz pasa por `pd.ExcelFile` y puede fallar; ese flujo queda pendiente de corrección.
 
-| Columna | Tipo | Descripción |
-|---------|------|-------------|
-| `ID_Biometrico` | Texto | Debe coincidir con `ID_Biometrico_SIRA` del catálogo |
-| `Fecha` | Fecha | Formato YYYY-MM-DD |
-| `Hora_CheckIn` | Hora | Formato HH:MM:SS |
-| `Hora_CheckOut` | Hora | Formato HH:MM:SS |
+## Ejemplo con datos ficticios
 
-Formatos aceptados: `.xlsx`, `.xls`, `.csv`
+Guarda el siguiente contenido como `demo_local.py` en una copia de trabajo y ejecuta `python demo_local.py`. Crea dos archivos nuevos para la demostración; ejecútalo en una carpeta donde esos nombres no contengan trabajo previo.
 
----
+```python
+import pandas as pd
 
-## Reglas de Negocio
+with pd.ExcelWriter("demo-maestra.xlsx", engine="openpyxl") as writer:
+    pd.DataFrame([{
+        "ID": "DEMO001", "Nombre completo": "PERSONA FICTICIA",
+        "Estatus": "activo", "Tipo de personal": "interno"
+    }]).to_excel(writer, sheet_name="1_Catalogo_Personal", index=False)
+    pd.DataFrame([{"ID": "DEMO001", "Rotación": "A"}]).to_excel(
+        writer, sheet_name="2_Rol_Guardias", index=False)
+    for sheet in ["3_Registro_Incidencias", "4_Vacaciones", "5_Rotaciones"]:
+        pd.DataFrame(columns=[
+            "ID", "Ausencia Justificada", "Fecha Inicio", "Fecha Termino"
+        ]).to_excel(writer, sheet_name=sheet, index=False)
 
-### Catálogo de Personal
-
-| Tipo | Regla |
-|------|-------|
-| **Interno** | `Especialidad_Base` puede quedar vacía — no genera error |
-| **Residente** | `Grado` debe seguir el patrón `R1`, `R2`, `R3`… |
-| **Período de Ingreso** | `A` = Primavera · `B` = Otoño |
-
-### Registro de Incidencias
-
-| Tipo | Comportamiento |
-|------|---------------|
-| Vacaciones, Incapacidad, Permiso, Comisión | Cubren el día sin evaluar asistencia |
-| **Rotación** | Requiere `Destino_o_Servicio` obligatorio; genera alerta si está vacío |
-| Cualquier tipo | `Notas_Motivo` se propaga al tooltip del calendario y al Excel |
-
-### Rol de Guardias — Tipos de Turno
-
-| Tipo | Horario por defecto | Configurable en `1_Reglas_ID` |
-|------|---------------------|-------------------------------|
-| **A** — Matutino | 08:00 – 15:00 | Sí, con "Horario Guardia A: HH:MM - HH:MM" |
-| **B** — Vespertino | 15:00 – 21:00 | Sí |
-| **C** — Nocturno | 21:00 – 08:00 | Sí |
-
-Para sobreescribir un horario, añadir una fila en `1_Reglas_ID`:
-- **Regla de Negocio:** `Horario Guardia A`
-- **Descripción:** `08:00 - 14:30`
-
----
-
-## Algoritmo Semáforo — Lógica de Prioridades
-
-Por cada empleado y cada día del mes, el sistema aplica en orden:
-
-```
-1. ¿Existe incidencia registrada?
-   → Asignar color según tipo (Vacaciones, Rotación, etc.) y detener.
-
-2. ¿No tiene turno en Rol de Guardias?
-   → ⚪ No Laborable (gris claro)
-
-3. ¿Tiene turno programado? → Evaluar escáner biométrico:
-   a. Sin marca de entrada → 🟠 Falta
-   b. CheckIn ≤ hora_turno + tolerancia → 🟡 Asistencia
-   c. CheckIn > hora_turno + tolerancia → 🔴 Retardo
+pd.DataFrame([{
+    "ID": "DEMO001", "Fecha": "2026-01-02",
+    "Entrada": "07:00", "Salida": "15:00"
+}]).to_excel("demo-scanner.xlsx", index=False)
 ```
 
-**Casos especiales:**
-- **Doble turno el mismo día:** se acepta sin error; se usa el CheckIn más temprano para evaluar puntualidad.
-- **Turno nocturno (Tipo C):** si el CheckOut es antes de las 06:00, el sistema lo propaga al día siguiente para evitar falsos "Falta".
+Abre la app, carga `demo-maestra.xlsx` y `demo-scanner.xlsx`, elige **A** como letra inicial del mes y procesa. Selecciona la persona ficticia y exporta su reporte.
 
-### Paleta de colores
+El generador existente `generar_datos_ejemplo.py` declara que usa identificadores procedentes de un escáner real. Antes de compartir datos o capturas del repositorio, confirma su anonimización y autorización. El ejemplo anterior utiliza un identificador creado para esta documentación.
 
-| Color | Estatus | Hex |
-|-------|---------|-----|
-| 🟡 Amarillo | Asistencia | `#FFD966` |
-| 🔴 Rojo | Retardo | `#FF4B4B` |
-| 🟠 Naranja | Falta | `#FF8C00` |
-| ⚪ Gris | No Laborable | `#D9D9D9` |
-| 🟢 Verde | Vacaciones | `#70AD47` |
-| 🔵 Azul claro | Incapacidad | `#9DC3E6` |
-| 💛 Amarillo pálido | Permiso | `#FFE699` |
-| 🔵 Celeste | Comisión | `#BDD7EE` |
-| 🟤 Ámbar | Rotación | `#F4B942` |
+## Reglas y arquitectura
 
----
+`main.py` inicia la interfaz de `ui.py`. Esta carga archivos mediante `ingestion.py`, llama a `core.py` y exporta con `export.py`; `utils.py` aporta estadísticas.
 
-## Módulos del Sistema
+El motor obtiene el mes más frecuente de los registros aplicables al catálogo, evalúa al personal activo y construye un ciclo A–B–C–D. La interfaz permite elegir la letra inicial del mes. Actualmente llama a `extraer_reglas` con un DataFrame vacío y utiliza valores predeterminados: no carga las reglas desde una hoja `1_Reglas_ID`.
 
-### `ingestion.py`
-- Lee y valida las 4 hojas del archivo maestro y el reporte del escáner.
-- Normaliza tipos de datos, fechas y horas.
-- Genera lista de **alertas no-bloqueantes** (rotaciones sin destino, grados no estándar, periodos inválidos).
-- Parsea horarios de turno A/B/C desde `1_Reglas_ID`.
+Existe también `SGAM_Proyecto_1.2.py` como implementación alternativa. El procedimiento documentado aquí utiliza `main.py`.
 
-### `core.py`
-- Motor principal: cruza catálogo × incidencias × guardias × escáner.
-- Aplica la lógica de prioridades y asigna estatus + color por día.
-- Propaga `Notas_Motivo` y `Destino_o_Servicio` de incidencias a cada registro.
-- Funciones de filtrado: `filtrar_por_empleado()`, `filtrar_por_tipo()`, `filtrar_por_especialidad()`.
+## Verificación y pendientes
 
-### `export.py`
-- `exportar_reporte_empleado()` — reporte individual con calendario coloreado + espacio de firma.
-- `exportar_todos()` — un archivo por cada empleado.
-- `exportar_filtrado()` — igual con filtros por Tipo o Especialidad.
-- `exportar_maestro_consolidado()` — **hoja única compacta**: una fila por médico, columnas 1–31 coloreadas, orientación landscape, optimizado para impresión.
+El 11 de septiembre de 2026 se comprobó la ruta **Excel ficticio → lectura → procesamiento → exportación individual** con Python 3.12.14 y pandas 3.0.5. Se generaron 31 filas correspondientes a enero y un archivo Excel legible. Es una prueba técnica con una persona ficticia; no mide precisión administrativa ni ahorro de tiempo.
 
-### `utils.py`
-- `estadisticas_por_empleado()` — métricas individuales completas.
-- `ranking_asistencia()` — top N empleados por % de asistencia.
-- `resumen_por_tipo()` — agregado Interno / Residente / Médico Adscrito.
-- `resumen_por_especialidad()` — agregado por especialidad.
-- `calcular_tendencia_semanal()` — distribución semana por semana.
-- `dias_criticos()` — días con mayor número de faltas + retardos.
-- `exportar_estadisticas_excel()` — Excel con 5 hojas de análisis.
+La sintaxis de los nueve archivos Python de la raíz pasó la revisión. No se probaron la interfaz gráfica, todos los formatos de escáner ni el empaquetado.
 
-### `ui.py`
-- Sidebar con secciones: Archivos de Entrada, Procesamiento, Exportación, Estadísticas.
-- Barra de búsqueda + ComboBox de empleados.
-- **Tablero Individual:** foto del médico, nombre, Tipo · Especialidad, calendario mensual coloreado + leyenda.
-- **Panel de Analítica:** gráfica de pastel con filtros dinámicos por Tipo y Especialidad + botón Vista Individual.
-- **Ventana de Estadísticas Avanzadas:** 5 pestañas con tablas interactivas y mini gráfica de tendencia.
-- Barra de estado inferior con contadores en tiempo real.
-- Alertas de validación mostradas al cargar la plantilla maestra.
+Pendientes: anonimización de archivos de muestra, pruebas de límites de mes y guardias, validación de CSV en la interfaz, unificación de versiones y preparación del empaquetado. `build_exe.py` referencia carpetas `assets/` y `data/` que no están en la copia revisada, por lo que no se presenta como un comando de instalación verificado.
 
----
-
-## Nombres de Archivos Generados
-
-```
-# Reporte individual:
-SGAM_Reporte_[Nombre_Empleado]_[Mes][Año].xlsx
-
-# Maestro consolidado:
-SGAM_Maestro_[Mes][Año].xlsx
-SGAM_Maestro_Residente_[Mes][Año].xlsx     ← con filtro de tipo
-SGAM_Maestro_Urgencias_[Mes][Año].xlsx     ← con filtro de especialidad
-
-# Estadísticas avanzadas:
-SGAM_Estadisticas_[Mes][Año].xlsx
-```
-
----
-
-## Generar Ejecutable `.exe`
-
-```bash
-pip install pyinstaller
-python build_exe.py
-# Genera: dist/SGAM.exe  (portable, sin instalar Python)
-```
-
----
-
-## Requerimientos del Sistema
-
-| Requisito | Mínimo |
-|-----------|--------|
-| Python | 3.11+ |
-| Sistema operativo | Windows 10/11 (UI gráfica) |
-| RAM | 4 GB recomendado |
-| Resolución | 1280 × 768 mínimo |
-| Dependencias | pandas · openpyxl · customtkinter · matplotlib · Pillow · pyinstaller |
-
----
-
-## Historial de Versiones
-
-| Versión | Cambios principales |
-|---------|---------------------|
-| **v1.2.0** | Módulo `utils.py` con estadísticas avanzadas · Ventana de estadísticas en UI · ROTACION como estatus propio · Notas de incidencia propagadas · Reporte maestro en hoja única compacta · Horarios A/B/C configurables · Barra de estado con contadores en vivo |
-| **v1.1.0** | Dobles turnos · Turnos nocturnos · Perfil con Tipo y Especialidad · Exportación con filtros · Reporte maestro multi-hoja |
-| **v1.0.0** | Versión inicial: carga, cruce, semáforo, calendario, exportación individual |
-
----
-
-## Mejoras Futuras
-
-1. **Base de datos SQLite** — persistencia entre sesiones y búsqueda de históricos
-2. **Módulo de login** — control de acceso RH vs consulta general
-3. **Exportación PDF** — reportes con firma digital integrada
-4. **Notificaciones por correo** — envío automático al generar reportes (smtplib)
-5. **Vigilancia de directorio** — importación automática al detectar nuevo archivo del escáner (watchdog)
-6. **Comparativo mensual** — gráficas de tendencia entre meses
-7. **Módulo de auditoría** — trazabilidad de cambios con usuario y timestamp
-8. **Soporte multi-hospital** — separación por unidad o departamento
