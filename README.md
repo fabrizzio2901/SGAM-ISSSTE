@@ -104,3 +104,6 @@ La sintaxis de los nueve archivos Python de la raíz pasó la revisión. No se p
 
 Pendientes: anonimización de archivos de muestra, pruebas de límites de mes y guardias, validación de CSV en la interfaz, unificación de versiones y preparación del empaquetado. `build_exe.py` referencia carpetas `assets/` y `data/` que no están en la copia revisada, por lo que no se presenta como un comando de instalación verificado.
 
+## Mi participación
+
+Mi rol fue de desarrollo integral de la aplicación: interfaz, procesamiento de datos y exportación de reportes. Es una aplicación de escritorio dentro de mi portafolio de desarrollo full stack.

@@ -104,3 +104,6 @@ All nine root Python files passed syntax parsing. The GUI, every scanner format 
 
 Pending work includes anonymizing sample data, month-boundary and duty tests, GUI CSV loading, consistent versioning and packaging preparation. `build_exe.py` references `assets/` and `data/`, which are absent from the reviewed checkout, so packaging is not presented as a verified installation command.
 
+## My contribution
+
+My role covered the desktop application across its interface, data processing and report exports. It is part of my full-stack development portfolio.
